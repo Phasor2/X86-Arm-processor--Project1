@@ -5,7 +5,7 @@ To map the UART2, I have to know the pins available to the Beagle Bones Black P9
 ![alt-text](https://github.com/Phasor2/Assembly-langguge-X86-Arm-processor-ECE372--Project1/blob/master/P8Header.PNG)
 In table 10 and table 11 above, The UART that is needed for this project is TxD, RxD, CTS, RTS. The default of the MUX when initialized it will begin in MODE0. Essentially in the manual ARM355x, the register name that use to map will be named in MODE0. So all we need to look up LCD_data8, lcd_data9 change to mode 6 and spi0_d0, and sp0_sclk change to mode 1.
 After mapping an and started the UART2 clock, next step is setting the desired Baud rate for UART to communicate with RC8660 Talker through RS-232C. This is a bit complex, there is a requirement for switching mode from operational mode UART to configuration mode A to change the DHL and DLL.  The clock is divided by the value written to the DLH and DLL register and the result is then divided by further by 13 or 16. So we all we need to do is change the mode write desired baud rate value into DHL and DLL. In the table 19-25 in the manual, the value that we want is 38.4 Kbps. As we can see we need to write 0x00 for DLH and 0x4E for DLL.
-![alt-text](https://github.com/Phasor2/Assembly-langguge-X86-Arm-processor-ECE372--Project1)
+![alt-text](https://github.com/Phasor2/Assembly-langguge-X86-Arm-processor-ECE372--Project1/blob/master/UART%20Baud%20Rate%20settings.png)
 
 
 # Interrupt unmasking 
