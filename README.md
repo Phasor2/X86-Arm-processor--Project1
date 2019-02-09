@@ -9,9 +9,9 @@ After mapping an and started the UART2 clock, next step is setting the desired B
 
 
 # Interrupt unmasking 
-	Unmasking 2 interrupts in INTC register. UART2INT is at int number 74 and the button GPIO1A is at int number 98. For GPIO1A, the pin calculated was pin 2 at INTC_MIR_CLEAR3 register. For UART2INT, the pin calculated was pin 10 at INTC_MIR_CLEAR2. Simply write 0x04 to INTC_MIR_CLEAR3 and write 0x400 to INTC_MIR_CLEAR2.
+Unmasking 2 interrupts in INTC register. UART2INT is at int number 74 and the button GPIO1A is at int number 98. For GPIO1A, the pin calculated was pin 2 at INTC_MIR_CLEAR3 register. For UART2INT, the pin calculated was pin 10 at INTC_MIR_CLEAR2. Simply write 0x04 to INTC_MIR_CLEAR3 and write 0x400 to INTC_MIR_CLEAR2.
 # Sending bytes to talker
-	There are 2 important signal we need to check in order to send character to talker. First is Clear to send (CTS#) active low, we need to look at MODEM register (MSR) bit 4. Second is Transmit Holding Register (THR), we need to look at Line Control Register (LSR) bit 5
+There are 2 important signal we need to check in order to send character to talker. First is Clear to send (CTS#) active low, we need to look at MODEM register (MSR) bit 4. Second is Transmit Holding Register (THR), we need to look at Line Control Register (LSR) bit 5
 Now we need to focus MSR bit 4 and LSR bit 5 and when is the Last char in the String. Making a truth table will be easier to keep track what is the next step to do after sending character. Because of MSR bit 4 is the signal come from Talker so we need to priority check this bit.
 ```
 MSR bit 4	LSR bit 5	Last character	Next step
