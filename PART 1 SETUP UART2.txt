@@ -1,0 +1,236 @@
+@Setting up STACK
+.text
+.global _start
+.global INT_DIRECTOR
+_start:
+	LDR R13,=STACK1 			@Point to base of STACK for SVC mode
+	ADD R13, R13, #0x1000 		@point to top of the STACK
+	CPS #0x12
+	LDR R13,=STACK2				@Point to base of STACK for IRQ mode
+	ADD R13, R13, #0x1000 		@Point to top of the STACK
+	CPS #0x13					@Back to SVC mode
+@===========================================================================
+@===========================================================================
+@ Turn on GPIO1 CLCK
+	MOV R0,#0x02				@value to turn on GPIO1_CLK 
+	LDR R1,=0x44E000AC			@Load the address for the CM_PER_GPIO1_CLKCTRL
+	STR R0,[R1]					@ Write value to the register
+@BUTTON SETUP using GPIO1 pin 30 for input button falling edge detect 
+@also enable its IRQ
+@ Detect falling edge on GPIO1_30
+	LDR R0,=0x4804C000			@base address for GPIO1 register
+	ADD R1,R0,#0x14C			@R1 is is GPIO1_FALLINGDETECT register
+	MOV R2,#0x40000000			@Load value pin GPIO1_30 push button
+	LDR R3,[R1]					@Load current value of GPIO1_FALLINGDETECT register
+	ORR R3,R3,R2				@Modify the pin GPIO_30 push button
+	STR R3, [R1]				@Store GPIO_30 push button for GPIO1_FALLINGDETECT
+@ GPIO1_IRQSTATUS  on pin 30 R2 0x40000000 sending interrupts to POINTPEND1
+	ADD R1,R0,#0x34				@R1 address of GPIO1_IRQSTATUS_SET_0 register
+	STR R2,[R1]					@Store pin 30 for GPIO1_IRQSTATUS_SET_0
+@ Initialize INTC Interrupts Controller
+	LDR R1,=0x48200000			@R1 loading base address for interrupts controller
+	MOV R2,#0x2				@Value to reset the INTC_CONFIG register
+	STR R2,[R1,#0x10]			@write value to reset the INTC CONFIG
+	MOV R2,#0x04				@ Value to unmask GPIOINTA , pin 2 INTC INT #98
+	STR R2,[R1,#0xE8]			@Write value to INTC_MIR_CLEAR3 register
+	MOV R2,#0x400				@value to unmask UART2INT pin 10 INTC INT #74
+	STR R2,[R1,#0xC8]			@Write value to INTC_MIR_CLEAR2 register
+@===================================================================================
+@===================================================================================
+@===================================================================================
+@UART2 Setting up Section
+@Mapping the UART2 TxD,RxD,CTS, and RTS using MUX.
+@0x44E10000 base address for Control Module
+@mode 1 : 001. need to AND 0xFFFFFFF9 for 0s at bit 2 and 3 . OR 0x1 for 1 last bit
+@mode 6: 110. need to OR 0x110 for 1s at bit 2 and 3. AND 0xFFFFFFF1 for 0 last bit
+@RxD UART2 mapping
+	LDR R0,=0x44E10950			@adding offset spi0_sclk in mode 1 for RxD UART2
+	LDR R2,[R0]					@Loading current value spi0_sclk
+	AND R2,R2,#0xFFFFFFF9		@AND for 0s at bit 2 and 3
+	ORR R2,R2,#0x1				@OR for 1 last bit
+	STR R2, [R1]				@store back for register spi0_sclk switching mode 1
+@TxD UART2 mapping	
+	LDR R1,=0x44E10954			@spi0_d0 in mode 1 for TxD UART2
+	LDR R3,[R1]					@Loading current value spi0_d0
+	AND R3,R3,#0xFFFFFFF9		@AND for 0s at bit 2 and 3
+	ORR R3,R3,#0x1				@OR for 1 last bit
+	STR R3, [R1]				@store back for register spi0_d0 switching mode 1
+@CTSN UART2 mapping
+	LDR R0,=0x44E108C0			@Lcd_data8 in mode 6 for CTSN UART2
+	LDR R2,[R0]					@Loading current value lcd_data8
+	AND R2,R2,#0xFFFFFFFE		@AND 0 for last bit
+	ORR R2,R2,#0x6				@OR 1s for bit 3 and 2
+	STR R2, [R0]				@store back for register lcd_data8 switching mode 6
+@RTSN UART2 mapping
+	LDR R1,=0x44E108C4			@Lcd_data9 in mode 6 for RTSN UART2
+	LDR R3,[R1]					@Loading current value lcd_data9
+	AND R3,R3,#0xFFFFFFFE		@AND 0 for last bit
+	ORR R3,R3,#0x6				@OR 1s for bit 3 and 2
+	STR R3, [R1]				@store back for register lcd_data9 switching mode 6
+@============================================================================
+@Turn on UART2 clock	CM_PER_UART2_CLKCTRL
+	MOV R2,#0x02				@value to turn on the clock
+	LDR R1,=0x44E00070			@base address for UART2 clock with offset 0x70
+	STR R2,[R1]					@Store value to turn on the clock
+@============================================================================
+@ Setting up Baud rate, 8 data bits, 1 stop bit, no parity, disable FIFO and enable interrupt IER_UART
+@ UART2 base address register 0x4802_4000 
+@0x48024000 base address UART2
+
+@Switch to Configuration mode A in UART_LCR offset 0x0C “bit 7 is 0x1”
+@and 8 data  bits , one stop bit, no parity. bit 3 is 0, bit 2 is 0, and 1:0 will both 1
+	LDR R0,=0x4802400C					@offset of LCR register
+	MOV R2,#0x83				@load value of LCR into R2
+	STR R2,[R0]					@store back in LCR register
+
+@Set 38.4 kbps Baud rate and a 16x divisor, DLL offset 0x00 write 0x00, DLH offset 0x04 write 0x4E 
+@Set DLL	
+	LDR R1,=0x48024000			@Address for DLL
+	MOV R3,#0x4E				@write value 0x00 to DLL
+	STR R3,[R1]					@write 0x00 to DLL offset 0x0
+@Set DLH	
+	LDR R0,=0x48024004			@address for DLH offset 0x04
+	MOV R2,#0x00				@write value 0x4E to DLH
+	STR R2,[R0]					@Store value 0x4E for DLH
+@Mode Definition 1 Register MDR offset 0x20 need to write 0x0 for UART 16x mode
+	LDR R1,=0x48024020			@R1 address MDR
+	MOV R3,#0x0				@value for 16x mode
+	STR R3,[R1]					@store value in MDR register
+@Change back Operational mode  in UART_LCR  offset 0x0C  “bit 7 is 0x0”
+	LDR R0,=0x4802400C			@0xC offset of LCR register
+	LDR R2,[R0]					@load value of LCR into R2
+	AND R2,R2,#0x7F				@write 0 to bit 7
+	STR R2,[R0]					@store back in LCR register
+@Clearing FIFO in FCR register offset at 0x8 bit 1 RX_FIFO, bit 2 TX_FIFO, bit 0 FIFO_EN. 
+	LDR R1,=0x48024008			@R1 address if FCR register
+	MOV R3,#0x06				@value bit 0 ==0, bit 1==1 and bit 2==1  so 110==0x6
+	STR R3,[R1]					@store value for FCR register
+@===================================================================================
+@==================================================================================
+@ Make sure Processor CPSR IRQ enable 
+	MRS R3,CPSR					@ Copy CPSR to R3
+	BIC R3,#0x80				@Clear bit 7
+	MSR CPSR_c, R3				@Write back to CPSR	
+
+@wait for interrupts
+LOOP:	NOP
+		B LOOP	
+@==================================================================================
+@==================================================================================
+INT_DIRECTOR:
+@Save the register on the stack
+	STMFD SP!, {R0-R3,LR}		@Push register on the stack
+@First check UART IRQ then check IRQ from button 
+CHECK_INTC_UART:	
+	LDR R0,=0x482000D8				@INTC_PENDING_IRQ2 for UART2 INTC
+	LDR R2,[R0]					@load value of PENDING_IRQ2
+	TST R2,#0x400				@UART2INT pin 10 INTC INT #74
+	BNE CHECK_UART				@Go to check IRQ in UART2
+CHECK_INTC_BUTTON:
+	LDR R0,=0x482000F8			@Address of INTC_PENDING_IRQ3 check button
+	LDR R2,[R0]					@Load value to check
+	TST R2,#0x04				@Button pin 2 INTC INT #98
+	BNE CHECK_BUTTON			@Go to check button in GPIO1
+
+@Checking UART IRQ using IIR_UART offset 0x8
+CHECK_UART:
+	LDR R0,=0x48024008			@IIR_UART2 base address
+	LDR R2,[R0]					@Load value of IIR_UART2
+	TST R2,#0x1					@check bit 0 IT_PENDING 
+	BEQ TALKER_SVC				@if 1 no IRQ, else 0 there is an IRQ
+	B PASS_ON					@if 1 then go to PASS_ON
+CHECK_BUTTON:
+	LDR R0,=0x4804C02C			@Check GPIO IRQ STATUS
+	LDR R2,[R0]					@Load value from GPIO
+	TST R2,#0x40000000			@Testing if GPIO1_30 IRQ register is 1 or 0
+	BNE BUTTON_SVC				@if z flag is clear Go to button service
+	B PASS_ON					@z flag is set go to PASS_ON
+@===================================================================================
+@Service section remember to turn off interrupt request for register
+BUTTON_SVC:
+@turn off IRQ request for GPIO1
+	LDR R1,=0x4804C02C			@GPIO1_IRQSTATUS_0 address
+	MOV R2,#0x40000000			@turn off GPIO1_IRQSTATUS at pin 30 by write a 1
+	STR R2,[R1]					@Writing value to turn IRQ off GPIO1_IRQ_RAW_0
+@enable Interrupt Enable Register IER_UART at offset 0x04
+@bit 3 is 1 for MODEM Status Change MSC  
+@bit 1 is 1 for Transmit Holding Register THR the rest is all 0s for reset value
+	LDR R1,=0x48024004				@R1 address of IER_UART
+	MOV R2,#0x000A				@1010 == 0xA value
+	STR R2,[R1]					@Store value into R1 IER_UART
+	B PASS_ON					@Go to PASS_ON
+
+TALKER_SVC:
+@There are 2 main registers take part in making decision whether to send character or pass on
+@Modem status register MSR bit 4 (Clear to send CTS#) 
+@Line status register LSR bit 5 (Transmit holding register THR)
+	LDR R0,=0x48024000			@Address UART_MSR register
+	ADD R1,R0,#0x18
+	LDR R2,[R1]					@value to check bit 4 clear to send CTS#
+	TST R2,#0x10				@check if CTS# is currently asserted
+	BEQ NO_CTS					@go to NO_CTS
+	LDR R0,=0x48024014			@Address UART_LSR register
+	LDR R2,[R0]					@value to check bit 5 Transmit holding register THR
+	TST R2,#0x20				@check if LSR bit 5 is currently asserted
+	BNE SEND_CHAR				@Go to SEND_CHAR if LSR bit 5 is 1
+	B PASS_ON					@otherwise if LSR bit 5 is 0 go to PASS_ON
+@@@@@@@@@@@@@@@
+NO_CTS:
+	LDR R0,=0x48024014			@Address UART_LSR to check bit 5 for THR
+	LDR R2,[R0]					@Load value to check bit 5  UART_LSR
+	TST R2, #0x20				@Check if LSR bit 5 is currently asserted
+	BEQ PASS_ON					@if LSR bit 5 is 0 go to PASS_ON
+@otherwise if LSR bit 5 is 1 disable THR interrupt and modem status register interrupt to avoid Spinning
+	LDR R0,=0x48024004			@Address IER_UART to clear bit 1 and 3
+	LDR R2,[R0]					@Load value to R-M-W
+	AND R2,R2,#0x5				@Clear bit 1 and 3 
+	STR R2,[R0]					@Write back to change bit 1 and 3
+	B PASS_ON					@Go to PASS_ON after clear
+@@@@@@@@@@@@@@@
+SEND_CHAR:
+@Turn on the THR interrupt and modem status register interrupt
+	LDR R0,=0x48024004			@address for IER_UART
+	MOV R2,#0x0A				@Set bit 3 = MODEM STATUS, bit 1 = THR interrupt
+	STR R2, [R0]				@Write to IER_UART
+@Send character
+	LDR R0,=CHAR_PTR			@R0 = address of pointer store
+	LDR R1,=CHAR_COUNT			@R1 = address of count store location
+	LDR R2,[R0]					@R2=Address of desired character in text string
+	LDR R3,[R1]					@R3=current character count value
+	LDRB R4,[R2],#1				@Read char to send from string
+	STR R2,[R0]					@Incremented address store BACK in CHAR_PTR
+	LDR R5,=0x48024000			@Load Transmit holding register to send char
+	STRB R4,[R5]				@Send char to Transmit buffer
+	SUBS R3,R3,#1				@Decrement Character count value by 1
+	STR R3,[R1]
+	BPL PASS_ON					@Greater than or equal zero, more Characters go back
+	LDR R2,=MESSAGE				@else if done then reload. Get address of starting string
+	STR R2,[R0]					@Write value reload back to address of pointer
+	MOV R2,#54					@Reload original number of char in String again
+	STR R2,[R1]					@Write to address of counter for the next message
+
+PASS_ON:
+	LDR R0,=0x48200048			@Address if INTC_CONTROL register
+	MOV R1,#0x1					@Value to clear bit 0
+	STR R1,[R0]					@Write to INTC_CONTROL register
+	LDMFD	SP!, {R0-R3,LR}		@restore register
+	SUBS PC,LR,#4				@return from the IRQ
+
+
+
+
+.data
+.align 2
+STACK1: .rept 1024
+		.word 0x0000
+		.endr
+STACK2: .rept 1024
+		.word 0x0000
+		.endr
+MESSAGE: .byte 0x0D
+.ascii "Your blood pressure is 120 over 70. Your pulse is 54."
+.byte 0x0D
+.align 2		
+CHAR_PTR: .word MESSAGE			@Pointer to next character
+CHAR_COUNT: .word 54			@counter for character to send
+.end
