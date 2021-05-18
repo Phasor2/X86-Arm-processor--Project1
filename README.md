@@ -1,4 +1,4 @@
-# Assembly-langguge-X86-Arm-processor-ECE372--Project1
+# X86-Arm-processor-ECE372--Project1
 Full report open ECE372 project1 2018 and code " * . txt"
 ## Initialization for UART2
 To map the UART2, I have to know the pins available to the Beagle Bones Black P9 and P8 connector by changing the MUX that select the signal go to the pads.
